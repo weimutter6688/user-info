@@ -21,18 +21,18 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Set environment variable for production
 ENV NODE_ENV production
+# Uncomment the following line in case you want to disable telemetry during runtime.
+# ENV NEXT_TELEMETRY_DISABLED 1
 
-# Copy built assets from the builder stage
-COPY --from=builder /app/.next ./.next
+# Copy the standalone output
+COPY --from=builder /app/.next/standalone ./
+# Copy the static assets
+COPY --from=builder /app/.next/static ./.next/static
+# Copy the public folder
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/package.json ./package.json
-# Copy node_modules from builder stage is needed for runtime by `npm start`
-COPY --from=builder /app/node_modules ./node_modules
 
-# Expose the port the app runs on (default 3000 for Next.js)
 EXPOSE 3000
 
-# Command to start the Next.js production server
-CMD ["npm", "start"]
+# Start the server using the standalone output's server.js
+CMD ["node", "server.js"]
