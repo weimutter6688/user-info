@@ -13,7 +13,7 @@ This project is a simple information recording system built with Next.js for the
 │   ├── models.py
 │   ├── schemas.py
 │   ├── requirements.txt
-│   └── .env.example
+│   └── .env.example   # Example environment variables
 ├── frontend/        # Next.js frontend application
 │   ├── public/
 │   ├── src/
@@ -60,19 +60,22 @@ Follow these steps to set up and run the project locally for development.
            ```
 
    c.  **Configure Environment Variables:**
-       Copy the example environment file and modify if necessary:
+       Copy the example environment file `backend/.env.example` to `backend/.env` and modify as needed:
        ```bash
        cp .env.example .env
        ```
-       *Note: The default `DATABASE_URL` uses a relative path `sqlite:///./user_info.db`. This file will be created in the project root when running from there.*
+       *   **`DATABASE_URL`**: Connection string for your database (defaults to SQLite in the project root).
+       *   **`BACKEND_PORT`**: The port the backend server should listen on (defaults to 8001 in `.env.example`). This informs the startup command.
+       *   **`SECRET_KEY`**: A secret key used for security purposes. **Generate a strong, unique key for production.**
 
    d.  **Run the Backend Server:**
-       Navigate back to the **project root directory** and run Uvicorn:
+       Navigate back to the **project root directory**. The `backend/main.py` loads the `.env` file. Start Uvicorn, specifying the port (ideally matching `BACKEND_PORT` in your `.env`):
        ```bash
        cd ..
+       # Ensure the port matches your .env setting (e.g., 8001)
        uvicorn backend.main:app --reload --port 8001
        ```
-       The backend API should now be running at `http://127.0.0.1:8001`.
+       The backend API should now be running at `http://127.0.0.1:8001` (or the port you configured).
 
 ### 2. Frontend Setup (Next.js)
 
@@ -96,7 +99,7 @@ Follow these steps to set up and run the project locally for development.
 ## Accessing the Application
 
 *   Open your web browser and navigate to `http://localhost:3000`.
-*   The frontend will connect to the backend API running on `http://127.0.0.1:8001`.
+*   The frontend connects to the backend API (ensure the backend URL and port used in the frontend code match where the backend is running, e.g., `http://127.0.0.1:8001`).
 
 ---
 
@@ -121,7 +124,7 @@ This section provides a general guide for deploying the application to a product
     ```bash
     pm2 start ecosystem.config.js
     ```
-    This will start the Next.js production server (using `npm start`) on port 3000.
+    This will start the Next.js production server (using `npm start`) on port 3000 (as defined in `ecosystem.config.js`).
 4.  **Manage with PM2:**
     *   `pm2 list`: View status.
     *   `pm2 logs user-info-frontend`: View logs.
@@ -152,8 +155,11 @@ This assumes a Linux server environment.
     *   `cd ..`
 
 4.  **Configure Backend:**
-    *   Set environment variables (e.g., `DATABASE_URL`) securely (system environment, systemd service file, or a `.env` file NOT in Git).
-    *   **Important:** For production, strongly consider using PostgreSQL or MySQL instead of SQLite. Update `DATABASE_URL` accordingly.
+    *   Create a `.env` file in the `backend` directory (or project root, ensure it's loaded correctly) based on `.env.example`. **Do not commit the actual `.env` file to Git.**
+    *   Set `DATABASE_URL` for your production database (PostgreSQL/MySQL recommended).
+    *   Set `BACKEND_PORT` to the desired port (e.g., 8001).
+    *   Set `SECRET_KEY` to a strong, randomly generated secret key (e.g., using `openssl rand -hex 32`).
+    *   Environment variables can also be set via the systemd service file (see below) or system-wide environment variables.
 
 5.  **Run with Gunicorn (Managed by systemd):**
     *   Create a systemd service file: `sudo nano /etc/systemd/system/userinfo-backend.service`
@@ -169,8 +175,14 @@ This assumes a Linux server environment.
         Group=your_deploy_group        # CHANGE: Group for the user
         WorkingDirectory=/path/to/deploy/dir # CHANGE: Project root directory
         # CHANGE: Ensure path to conda env's gunicorn is correct
+        # The --bind port should match BACKEND_PORT in your .env or config
         ExecStart=/path/to/miniconda3/envs/userinfo_prod_env/bin/gunicorn backend.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8001
-        # Environment="DATABASE_URL=your_production_db_url" # Example: Set env var here
+        # Example: Load .env file if placed in WorkingDirectory/backend
+        # EnvironmentFile=/path/to/deploy/dir/backend/.env
+        # Or set directly:
+        # Environment="DATABASE_URL=your_production_db_url"
+        # Environment="SECRET_KEY=your_production_secret"
+        # Environment="BACKEND_PORT=8001"
 
         Restart=always
         RestartSec=3
@@ -180,7 +192,7 @@ This assumes a Linux server environment.
         ```
         *   Find the exact `gunicorn` path using `which gunicorn` after activating the conda environment.
         *   Adjust `-w 4` (worker count) based on server CPU cores.
-        *   Adjust `--bind 0.0.0.0:8001` if you need a different port.
+        *   Ensure the `--bind 0.0.0.0:PORT` matches your `BACKEND_PORT` configuration.
 
     *   Enable and start the service:
         ```bash
@@ -206,7 +218,8 @@ This assumes a Linux server environment.
             # ssl_certificate_key /path/to/key.pem;
 
             location /api { # Proxy requests starting with /api to the backend
-                proxy_pass http://127.0.0.1:8001; # Match the port Gunicorn is bound to
+                # Ensure this port matches the one Gunicorn/Uvicorn is bound to (e.g., 8001)
+                proxy_pass http://127.0.0.1:8001;
                 proxy_set_header Host $host;
                 proxy_set_header X-Real-IP $remote_addr;
                 proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -215,11 +228,6 @@ This assumes a Linux server environment.
 
             # Add configuration to serve the frontend if needed,
             # or handle it separately (e.g., via Vercel, Netlify, or PM2 serving static files).
-            # Example for serving Next.js static export (less common):
-            # location / {
-            #    root /path/to/frontend/out;
-            #    try_files $uri $uri/ /index.html;
-            # }
         }
         ```
     *   Enable the site and restart Nginx:
@@ -229,4 +237,4 @@ This assumes a Linux server environment.
         sudo systemctl restart nginx
         ```
 
-Now, your frontend should be accessible directly (e.g., `http://your_domain.com:3000` if not proxied) or via Nginx, and backend requests to `/api` should be routed by Nginx to the FastAPI application running via Gunicorn/systemd.
+Now, your frontend should be accessible directly or via Nginx, and backend requests to `/api` should be routed by Nginx to the FastAPI application running via Gunicorn/systemd on the configured port.

@@ -1,9 +1,16 @@
+import os # Import os module
+from dotenv import load_dotenv # Import load_dotenv
 from fastapi import FastAPI, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
 from . import crud, models, schemas, database
 from .database import SessionLocal, engine, create_db_and_tables, connect_db, disconnect_db
+
+# Load environment variables from .env file
+# This should be one of the first things your application does.
+# It will load variables from a .env file in the current directory or parent directories.
+load_dotenv()
 
 # Create database tables on startup if they don't exist
 # In production, you'd likely use Alembic migrations instead.
