@@ -1,6 +1,6 @@
 # User Information Management System
 
-This project is a simple information recording system built with Next.js for the frontend and FastAPI for the backend API, using SQLite as the database.
+This project is a simple information recording system built with Next.js for the frontend and FastAPI for the backend API. It supports both SQLite and PostgreSQL databases via configuration.
 
 ## Project Structure
 
@@ -12,7 +12,7 @@ This project is a simple information recording system built with Next.js for the
 │   ├── main.py
 │   ├── models.py
 │   ├── schemas.py
-│   ├── requirements.txt
+│   ├── requirements.txt # Python dependencies
 │   └── .env.example   # Example environment variables
 ├── frontend/        # Next.js frontend application
 │   ├── public/
@@ -33,6 +33,7 @@ This project is a simple information recording system built with Next.js for the
 *   **Python**: Version 3.8 or higher (Miniconda recommended for environment management).
 *   **Node.js**: Version 18.x or higher.
 *   **npm**: Comes with Node.js.
+*   **(Optional) PostgreSQL Server**: If you choose to use PostgreSQL instead of SQLite.
 
 ## Development Setup & Running
 
@@ -52,6 +53,7 @@ Follow these steps to set up and run the project locally for development.
            conda activate myenv
            pip install -r requirements.txt
            ```
+           *Note: `requirements.txt` includes `fastapi`, `uvicorn`, `sqlalchemy`, `databases`, `python-dotenv`, `aiosqlite` (for SQLite), and `asyncpg` (for PostgreSQL).*
        *   **Using venv (alternative):**
            ```bash
            python3 -m venv venv
@@ -59,13 +61,16 @@ Follow these steps to set up and run the project locally for development.
            pip install -r requirements.txt
            ```
 
-   c.  **Configure Environment Variables:**
-       Copy the example environment file `backend/.env.example` to `backend/.env` and modify as needed:
+   c.  **Configure Environment Variables & Choose Database:**
+       Copy the example environment file `backend/.env.example` to `backend/.env` and **modify it to select your database**:
        ```bash
        cp .env.example .env
+       nano .env # Or use your preferred editor
        ```
-       *   **`DATABASE_URL`**: Connection string for your database (defaults to SQLite in the project root).
-       *   **`BACKEND_PORT`**: The port the backend server should listen on (defaults to 8001 in `.env.example`). This informs the startup command.
+       *   **`DATABASE_URL`**: **Uncomment and configure ONE** of the database URL options:
+           *   For **SQLite**: `DATABASE_URL="sqlite+aiosqlite:///./user_info.db"` (File will be created in project root).
+           *   For **PostgreSQL**: `DATABASE_URL="postgresql+asyncpg://user:password@host:port/database"` (Replace with your actual credentials).
+       *   **`BACKEND_PORT`**: The port the backend server should listen on (defaults to 8001).
        *   **`SECRET_KEY`**: A secret key used for security purposes. **Generate a strong, unique key for production.**
 
    d.  **Run the Backend Server:**
@@ -75,7 +80,7 @@ Follow these steps to set up and run the project locally for development.
        # Ensure the port matches your .env setting (e.g., 8001)
        uvicorn backend.main:app --reload --port 8001
        ```
-       The backend API should now be running at `http://127.0.0.1:8001` (or the port you configured).
+       The backend API should now be running at `http://127.0.0.1:8001` (or the port you configured), connected to the database specified in your `.env` file.
 
 ### 2. Frontend Setup (Next.js)
 
@@ -142,6 +147,7 @@ This assumes a Linux server environment.
     *   Install Miniconda on the server.
     *   Install Git (`sudo apt install git` or `sudo yum install git`).
     *   (Recommended) Install Nginx (`sudo apt install nginx` or `sudo yum install nginx`) as a reverse proxy.
+    *   (If using PostgreSQL) Ensure PostgreSQL server is installed and running.
 
 2.  **Deploy Code:**
     *   SSH into your server.
@@ -152,7 +158,7 @@ This assumes a Linux server environment.
     *   `conda create --name userinfo_prod_env python=3.9 -y` (Adjust Python version if needed)
     *   `conda activate userinfo_prod_env`
     *   `cd backend`
-    *   `pip install -r requirements.txt`
+    *   `pip install -r requirements.txt` (This installs drivers for both SQLite and PostgreSQL)
     *   `pip install gunicorn` # Install Gunicorn for production serving
     *   `cd ..`
 
@@ -160,7 +166,7 @@ This assumes a Linux server environment.
     *   On the server, create a `.env` file inside the `backend` directory: `nano backend/.env`
     *   Copy the contents from `backend/.env.example` and fill in your **production** values.
     *   **Crucially, ensure this `.env` file is NOT committed to Git.** Add `backend/.env` to your root `.gitignore` file if it's not already covered.
-    *   Set `DATABASE_URL` for your production database (PostgreSQL/MySQL recommended).
+    *   Set **one** `DATABASE_URL` for your chosen production database (e.g., `postgresql+asyncpg://...` or `sqlite+aiosqlite:///path/to/prod/user_info.db`).
     *   Set `BACKEND_PORT` (e.g., 8001).
     *   Set `SECRET_KEY` to a strong, random value (e.g., `openssl rand -hex 32`).
 
@@ -171,7 +177,7 @@ This assumes a Linux server environment.
         ```ini
         [Unit]
         Description=User Info Backend Service (FastAPI)
-        After=network.target
+        After=network.target postgresql.service # Add postgresql.service if using PostgreSQL
 
         [Service]
         User=your_deploy_user         # CHANGE: User running the service
@@ -192,8 +198,9 @@ This assumes a Linux server environment.
         [Install]
         WantedBy=multi-user.target
         ```
-        *   **`EnvironmentFile`**: This line tells systemd to load variables from your `.env` file before starting the process. This is generally preferred over relying solely on the application's `load_dotenv()`.
+        *   **`EnvironmentFile`**: This line tells systemd to load variables from your `.env` file before starting the process.
         *   **`ExecStart`**: Find the exact `gunicorn` path using `which gunicorn` (after activating the conda environment). Adjust `-w 4` (worker count) based on server CPU cores. Ensure the `--bind 0.0.0.0:PORT` uses the correct port (e.g., 8001) that Nginx will connect to.
+        *   **`After=`**: Added `postgresql.service` as an example dependency if using PostgreSQL. Adjust if your service name is different.
 
     *   Enable and start the service:
         ```bash
@@ -238,4 +245,4 @@ This assumes a Linux server environment.
         sudo systemctl restart nginx
         ```
 
-Now, your backend configuration is primarily managed via the `.env` file on the server, which is loaded by the systemd service before starting Gunicorn. Nginx proxies requests to the port specified in the Gunicorn startup command.
+Now, your backend configuration is primarily managed via the `.env` file on the server, allowing selection between SQLite and PostgreSQL, and loaded by the systemd service before starting Gunicorn. Nginx proxies requests to the port specified in the Gunicorn startup command.

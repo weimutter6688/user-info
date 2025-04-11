@@ -6,3 +6,4 @@ pydantic[email]>=2.0.0
 python-dotenv>=0.20.0 # For loading .env files (optional but recommended)
 python-multipart>=0.0.5 # Often needed for form data, good to include
 aiosqlite>=0.17.0 # Explicitly add if needed, though databases[sqlite] should pull it in
+asyncpg>=0.25.0 # Add async driver for PostgreSQL
