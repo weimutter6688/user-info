@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation'; // Use next/navigation for App Rout
 import Link from 'next/link';
 import { User } from '@/types'; // Assuming types are correctly defined
 
-const API_BASE_URL = 'http://127.0.0.1:8001'; // Backend API URL (Consider centralizing this)
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8001'; // Use env var, fallback for safety
 
 export default function UserDetailPage() {
   const params = useParams();

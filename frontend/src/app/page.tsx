@@ -15,7 +15,7 @@ export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [editingUser, setEditingUser] = useState<User | null>(null); // State to hold the user being edited
-  const API_BASE_URL = 'http://127.0.0.1:8001'; // Backend API URL
+  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8001'; // Use env var, fallback for safety
 
   const fetchUsers = async () => {
     setLoading(true);

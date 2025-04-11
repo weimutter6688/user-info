@@ -2,7 +2,7 @@
 services:
   db-postgres:
     image: postgres:15-alpine # Use an official PostgreSQL image
-    container_name: userinfo_db_postgres
+    container_name: ${COMPOSE_PROJECT_NAME}_db_postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data/ # Persist data using a named volume
     environment:
@@ -24,7 +24,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: userinfo_backend_postgres
+    container_name: ${COMPOSE_PROJECT_NAME}_backend_postgres
     depends_on:
       db-postgres: # Wait for the database service to be healthy
         condition: service_healthy
@@ -34,16 +34,23 @@ services:
       # Ensure the password matches the POSTGRES_PASSWORD above
       # SECRET_KEY: "your_secret_key_for_postgres_compose" # Add other env vars if needed
       BACKEND_PORT: 8001 # Informational
+      # Define allowed origins for CORS, comma-separated.
+      # IMPORTANT: Change this for production to your actual frontend URL(s)!
+      # Example for local Docker Compose access:
+      # Value is read from the .env file in the same directory
+      ALLOWED_ORIGINS: "${ALLOWED_ORIGINS}"
+      # Example for production: ALLOWED_ORIGINS: "https://yourdomain.com"
     ports:
       # Map host port 8001 to container port 8001
-      - "8001:8001"
+      # Map host port 8001 to the backend's internal port defined in .env
+      - "8001:${BACKEND_INTERNAL_PORT}"
     restart: unless-stopped
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: userinfo_frontend_pg # Slightly different name to avoid conflict if run simultaneously
+    container_name: ${COMPOSE_PROJECT_NAME}_frontend_pg # Slightly different name to avoid conflict if run simultaneously
     ports:
       # Map host port 3000 to container port 3000
       - "3000:3000"
@@ -52,6 +59,9 @@ services:
     environment:
       # NEXT_PUBLIC_API_URL: http://backend-postgres:8001/api # If needed at runtime
       NODE_ENV: production
+      # Set the base URL for the frontend to reach the backend API within the Docker network
+      # Construct the API base URL using variables from .env for the backend service name and port
+      NEXT_PUBLIC_API_BASE_URL: http://${BACKEND_SERVICE_NAME}:${BACKEND_INTERNAL_PORT}
     restart: unless-stopped
 
 volumes:

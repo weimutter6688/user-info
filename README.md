@@ -158,7 +158,53 @@ Two Docker Compose files are provided:
     *   Frontend: `http://localhost:3000`
     *   Backend API: `http://localhost:8001/docs`
 
-### Environment Variables in Compose
+### Production Deployment Workflow (Using `.env` file)
+
+This project is configured to use a `.env` file in the project root directory to manage environment-specific configurations for Docker Compose. This allows you to maintain different configurations for development and production without modifying the `docker-compose.*.yml` files directly.
+
+1.  **Prepare Production `.env` File:**
+    *   On your **production server**, navigate to the directory where you will deploy the project code (e.g., `/path/to/deploy/dir`).
+    *   Create a file named `.env` in this directory.
+    *   **Do NOT copy your local development `.env` file directly.** Instead, populate this new `.env` file with your **production-specific** values. Example:
+        ```dotenv
+        # .env on Production Server
+
+        # Backend Configuration
+        BACKEND_SERVICE_NAME=backend-postgres # Or your chosen service name
+        BACKEND_INTERNAL_PORT=8001
+
+        # Frontend Configuration / CORS
+        # IMPORTANT: Set this to your actual production frontend URL(s), comma-separated
+        ALLOWED_ORIGINS="https://your-production-domain.com"
+
+        # Optional: Define a project name for Docker Compose
+        COMPOSE_PROJECT_NAME=userinfo_prod
+
+        # Add any other production-specific variables needed by compose here
+        # e.g., production database credentials if not managed elsewhere
+        # POSTGRES_USER=prod_user
+        # POSTGRES_PASSWORD=very_strong_production_password
+        # POSTGRES_DB=prod_db
+        ```
+    *   **Security:** Ensure this `.env` file on the server has appropriate permissions and is **never** committed to your Git repository (the root `.gitignore` file should already be configured to ignore `.env`).
+
+2.  **Deploy Code:**
+    *   Deploy your project code (excluding the `.env` file) to the production server directory (e.g., using `git clone` or `scp`).
+
+3.  **Run Docker Compose:**
+    *   Navigate to the project root directory on the production server (where the `.env` file and `docker-compose.postgres.yml` are located).
+    *   Run Docker Compose using the appropriate file (e.g., `docker-compose.postgres.yml` for the PostgreSQL setup):
+        ```bash
+        # Ensure you are in the directory containing docker-compose.postgres.yml and the production .env file
+        docker-compose -f docker-compose.postgres.yml up --build -d
+        ```
+    *   Docker Compose will automatically detect and load the variables from the `.env` file in the current directory. It will use these values (e.g., the production `ALLOWED_ORIGINS`) when creating and configuring the containers.
+
+4.  **Access:** Access your application via your production frontend URL (e.g., `https://your-production-domain.com`).
+
+This `.env` file approach provides a clean separation between configuration and code, making deployments safer and more manageable across different environments.
+
+### Environment Variables in Compose (General Notes)
 
 *   The `docker-compose.*.yml` files define necessary environment variables for the services, including `DATABASE_URL`.
 *   For the PostgreSQL setup, the backend's `DATABASE_URL` uses the service name `db-postgres` as the host, enabling communication between containers.

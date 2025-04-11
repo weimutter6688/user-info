@@ -40,19 +40,25 @@ async def shutdown_event():
 from fastapi.middleware.cors import CORSMiddleware
 
 # Configure CORS (Cross-Origin Resource Sharing)
-# Adjust origins based on your frontend's URL in development/production
-origins = [
-    "http://localhost",      # Allow localhost for development
-    "http://localhost:3000", # Default Next.js dev port
-    # Add your frontend production URL here
-]
+# Read allowed origins from environment variable for flexibility and security
+# The variable should contain comma-separated URLs (e.g., "http://localhost:3000,https://yourdomain.com")
+allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "") # Default to empty string if not set
+origins = [origin.strip() for origin in allowed_origins_str.split(",") if origin.strip()]
+
+# Provide a fallback for local development if ALLOWED_ORIGINS is not explicitly set
+# You might want to refine this based on your local setup needs
+if not origins and os.getenv("NODE_ENV", "production") == "development": # Example check
+     print("Warning: ALLOWED_ORIGINS not set, falling back to default development origins.")
+     origins = ["http://localhost", "http://localhost:3000", "http://127.0.0.1:3000"]
+
+print(f"Configuring CORS with allowed origins: {origins}") # Log the origins being used
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"], # Allow all methods (GET, POST, PUT, DELETE, etc.)
-    allow_headers=["*"], # Allow all headers
+    allow_origins=origins, # Use the dynamically loaded list
+    allow_credentials=True, # Set to True if you need cookies/auth headers (adjust frontend too)
+    allow_methods=["*"],    # Allow all standard methods
+    allow_headers=["*"],    # Allow all standard headers
 )
 
 
