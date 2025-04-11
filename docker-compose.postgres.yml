@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  db-postgres:
+    image: postgres:15-alpine # Use an official PostgreSQL image
+    container_name: userinfo_db_postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/ # Persist data using a named volume
+    environment:
+      # Set PostgreSQL credentials
+      POSTGRES_USER: userinfo_user
+      POSTGRES_PASSWORD: userinfo_password # CHANGE THIS IN PRODUCTION!
+      POSTGRES_DB: userinfo_db
+    ports:
+      # Optionally map host port to container port for external access (e.g., debugging)
+      # - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+        test: ["CMD-SHELL", "pg_isready -U userinfo_user -d userinfo_db"]
+        interval: 10s
+        timeout: 5s
+        retries: 5
+
+  backend-postgres:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: userinfo_backend_postgres
+    depends_on:
+      db-postgres: # Wait for the database service to be healthy
+        condition: service_healthy
+    environment:
+      # Set DATABASE_URL for PostgreSQL, using service name 'db-postgres' as host
+      DATABASE_URL: "postgresql+asyncpg://userinfo_user:userinfo_password@db-postgres:5432/userinfo_db"
+      # Ensure the password matches the POSTGRES_PASSWORD above
+      # SECRET_KEY: "your_secret_key_for_postgres_compose" # Add other env vars if needed
+      BACKEND_PORT: 8001 # Informational
+    ports:
+      # Map host port 8001 to container port 8001
+      - "8001:8001"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: userinfo_frontend_pg # Slightly different name to avoid conflict if run simultaneously
+    ports:
+      # Map host port 3000 to container port 3000
+      - "3000:3000"
+    # depends_on:
+    #   - backend-postgres # Simple dependency
+    environment:
+      # NEXT_PUBLIC_API_URL: http://backend-postgres:8001/api # If needed at runtime
+      NODE_ENV: production
+    restart: unless-stopped
+
+volumes:
+  postgres_data: # Define the named volume for data persistence
+    driver: local

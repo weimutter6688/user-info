@@ -6,7 +6,8 @@ This project is a simple information recording system built with Next.js for the
 
 ```
 /
-├── backend/         # FastAPI backend application
+├── backend/
+│   ├── Dockerfile       # Dockerfile for backend
 │   ├── crud.py
 │   ├── database.py
 │   ├── main.py
@@ -14,7 +15,8 @@ This project is a simple information recording system built with Next.js for the
 │   ├── schemas.py
 │   ├── requirements.txt # Python dependencies
 │   └── .env.example   # Example environment variables
-├── frontend/        # Next.js frontend application
+├── frontend/
+│   ├── Dockerfile       # Dockerfile for frontend
 │   ├── public/
 │   ├── src/
 │   │   ├── app/
@@ -24,8 +26,10 @@ This project is a simple information recording system built with Next.js for the
 │   ├── package.json
 │   └── ...
 ├── .gitignore
-├── ecosystem.config.js # PM2 config for frontend
-└── README.md        # This file
+├── ecosystem.config.js      # PM2 config for frontend (alternative deployment)
+├── docker-compose.sqlite.yml  # Docker Compose for SQLite setup
+├── docker-compose.postgres.yml # Docker Compose for PostgreSQL setup
+└── README.md               # This file
 ```
 
 ## Prerequisites
@@ -33,7 +37,8 @@ This project is a simple information recording system built with Next.js for the
 *   **Python**: Version 3.8 or higher (Miniconda recommended for environment management).
 *   **Node.js**: Version 18.x or higher.
 *   **npm**: Comes with Node.js.
-*   **(Optional) PostgreSQL Server**: If you choose to use PostgreSQL instead of SQLite.
+*   **(Optional) PostgreSQL Server**: If you choose to use PostgreSQL instead of SQLite for local development.
+*   **(For Containerization) Docker & Docker Compose**: Install Docker Desktop or Docker Engine and Docker Compose V2.
 
 ## Development Setup & Running
 
@@ -108,13 +113,77 @@ Follow these steps to set up and run the project locally for development.
 
 ---
 
-## Production Deployment
+## Containerized Deployment (Docker)
 
-This section provides a general guide for deploying the application to a production server.
+This section describes how to build and run the application using Docker and Docker Compose. This is often preferred for consistency across environments and simplified deployment.
+
+### Prerequisites
+
+*   Docker Engine installed.
+*   Docker Compose V2 installed (usually included with Docker Desktop or installed as a plugin).
+
+### Building and Running
+
+Two Docker Compose files are provided:
+
+*   `docker-compose.sqlite.yml`: Runs the frontend and backend using SQLite for the database.
+*   `docker-compose.postgres.yml`: Runs the frontend, backend, and a PostgreSQL database service.
+
+**Choose ONE** of the following options:
+
+**Option 1: Using SQLite**
+
+1.  **Navigate to the project root directory.**
+2.  **Run Docker Compose:**
+    ```bash
+    docker-compose -f docker-compose.sqlite.yml up --build -d
+    ```
+    *   `--build`: Builds the images if they don't exist or if the Dockerfiles/context have changed.
+    *   `-d`: Runs the containers in detached mode (in the background).
+3.  **Database Persistence:** A file named `user_info_sqlite.db` will be created in your project root directory on the host machine, storing the SQLite data.
+4.  **Access:**
+    *   Frontend: `http://localhost:3000`
+    *   Backend API (e.g., for direct testing): `http://localhost:8001/docs`
+
+**Option 2: Using PostgreSQL**
+
+1.  **Navigate to the project root directory.**
+2.  **(Optional) Customize Credentials:** You can modify the default PostgreSQL username, password, and database name directly within the `docker-compose.postgres.yml` file (`db-postgres` service environment variables and `backend-postgres` `DATABASE_URL`). **Remember to use strong passwords in a real production scenario.**
+3.  **Run Docker Compose:**
+    ```bash
+    docker-compose -f docker-compose.postgres.yml up --build -d
+    ```
+4.  **Database Persistence:** PostgreSQL data is stored in a Docker named volume (`postgres_data`), managed by Docker.
+5.  **Access:**
+    *   Frontend: `http://localhost:3000`
+    *   Backend API: `http://localhost:8001/docs`
+
+### Environment Variables in Compose
+
+*   The `docker-compose.*.yml` files define necessary environment variables for the services, including `DATABASE_URL`.
+*   For the PostgreSQL setup, the backend's `DATABASE_URL` uses the service name `db-postgres` as the host, enabling communication between containers.
+*   You can add or override environment variables (like `SECRET_KEY`) directly within the `environment:` section of the respective service in the compose file if needed, especially for production secrets management (though more advanced methods like Docker secrets or external configuration tools exist).
+
+### Stopping the Application
+
+To stop the containers defined in a specific compose file:
+
+```bash
+# For SQLite setup
+docker-compose -f docker-compose.sqlite.yml down
+
+# For PostgreSQL setup
+docker-compose -f docker-compose.postgres.yml down
+```
+*   `down`: Stops and removes the containers, network, and (for PostgreSQL) the named volume unless specified otherwise.
+
+---
+
+## Production Deployment (Non-Containerized)
+
+This section provides a general guide for deploying the application to a production server **without using Docker**.
 
 ### Frontend (Next.js) with PM2
-
-(Instructions remain the same as before)
 
 1.  **Build the Frontend:**
     ```bash
