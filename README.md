@@ -109,6 +109,8 @@ This section provides a general guide for deploying the application to a product
 
 ### Frontend (Next.js) with PM2
 
+(Instructions remain the same as before)
+
 1.  **Build the Frontend:**
     ```bash
     cd frontend
@@ -154,12 +156,13 @@ This assumes a Linux server environment.
     *   `pip install gunicorn` # Install Gunicorn for production serving
     *   `cd ..`
 
-4.  **Configure Backend:**
-    *   Create a `.env` file in the `backend` directory (or project root, ensure it's loaded correctly) based on `.env.example`. **Do not commit the actual `.env` file to Git.**
+4.  **Configure Backend (`.env` file):**
+    *   On the server, create a `.env` file inside the `backend` directory: `nano backend/.env`
+    *   Copy the contents from `backend/.env.example` and fill in your **production** values.
+    *   **Crucially, ensure this `.env` file is NOT committed to Git.** Add `backend/.env` to your root `.gitignore` file if it's not already covered.
     *   Set `DATABASE_URL` for your production database (PostgreSQL/MySQL recommended).
-    *   Set `BACKEND_PORT` to the desired port (e.g., 8001).
-    *   Set `SECRET_KEY` to a strong, randomly generated secret key (e.g., using `openssl rand -hex 32`).
-    *   Environment variables can also be set via the systemd service file (see below) or system-wide environment variables.
+    *   Set `BACKEND_PORT` (e.g., 8001).
+    *   Set `SECRET_KEY` to a strong, random value (e.g., `openssl rand -hex 32`).
 
 5.  **Run with Gunicorn (Managed by systemd):**
     *   Create a systemd service file: `sudo nano /etc/systemd/system/userinfo-backend.service`
@@ -174,15 +177,14 @@ This assumes a Linux server environment.
         User=your_deploy_user         # CHANGE: User running the service
         Group=your_deploy_group        # CHANGE: Group for the user
         WorkingDirectory=/path/to/deploy/dir # CHANGE: Project root directory
+
+        # Recommended: Load environment variables from the .env file
+        EnvironmentFile=/path/to/deploy/dir/backend/.env # CHANGE: Path to your .env file
+
         # CHANGE: Ensure path to conda env's gunicorn is correct
-        # The --bind port should match BACKEND_PORT in your .env or config
+        # The --bind port MUST match the port Nginx proxies to (e.g., 8001)
+        # It should ideally also match BACKEND_PORT in .env for consistency.
         ExecStart=/path/to/miniconda3/envs/userinfo_prod_env/bin/gunicorn backend.main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8001
-        # Example: Load .env file if placed in WorkingDirectory/backend
-        # EnvironmentFile=/path/to/deploy/dir/backend/.env
-        # Or set directly:
-        # Environment="DATABASE_URL=your_production_db_url"
-        # Environment="SECRET_KEY=your_production_secret"
-        # Environment="BACKEND_PORT=8001"
 
         Restart=always
         RestartSec=3
@@ -190,9 +192,8 @@ This assumes a Linux server environment.
         [Install]
         WantedBy=multi-user.target
         ```
-        *   Find the exact `gunicorn` path using `which gunicorn` after activating the conda environment.
-        *   Adjust `-w 4` (worker count) based on server CPU cores.
-        *   Ensure the `--bind 0.0.0.0:PORT` matches your `BACKEND_PORT` configuration.
+        *   **`EnvironmentFile`**: This line tells systemd to load variables from your `.env` file before starting the process. This is generally preferred over relying solely on the application's `load_dotenv()`.
+        *   **`ExecStart`**: Find the exact `gunicorn` path using `which gunicorn` (after activating the conda environment). Adjust `-w 4` (worker count) based on server CPU cores. Ensure the `--bind 0.0.0.0:PORT` uses the correct port (e.g., 8001) that Nginx will connect to.
 
     *   Enable and start the service:
         ```bash
@@ -218,7 +219,7 @@ This assumes a Linux server environment.
             # ssl_certificate_key /path/to/key.pem;
 
             location /api { # Proxy requests starting with /api to the backend
-                # Ensure this port matches the one Gunicorn/Uvicorn is bound to (e.g., 8001)
+                # Ensure this port matches the one Gunicorn/Uvicorn is bound to in ExecStart (e.g., 8001)
                 proxy_pass http://127.0.0.1:8001;
                 proxy_set_header Host $host;
                 proxy_set_header X-Real-IP $remote_addr;
@@ -237,4 +238,4 @@ This assumes a Linux server environment.
         sudo systemctl restart nginx
         ```
 
-Now, your frontend should be accessible directly or via Nginx, and backend requests to `/api` should be routed by Nginx to the FastAPI application running via Gunicorn/systemd on the configured port.
+Now, your backend configuration is primarily managed via the `.env` file on the server, which is loaded by the systemd service before starting Gunicorn. Nginx proxies requests to the port specified in the Gunicorn startup command.
