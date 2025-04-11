@@ -50,6 +50,10 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      # Pass the API base URL as a build argument
+      args:
+        # Use the actual service name 'backend-postgres' directly
+        NEXT_PUBLIC_API_BASE_URL: http://backend-postgres:${BACKEND_INTERNAL_PORT}
     container_name: ${COMPOSE_PROJECT_NAME}_frontend_pg # Slightly different name to avoid conflict if run simultaneously
     ports:
       # Map host port 3000 to container port 3000
@@ -61,7 +65,8 @@ services:
       NODE_ENV: production
       # Set the base URL for the frontend to reach the backend API within the Docker network
       # Construct the API base URL using variables from .env for the backend service name and port
-      NEXT_PUBLIC_API_BASE_URL: http://${BACKEND_SERVICE_NAME}:${BACKEND_INTERNAL_PORT}
+      # Use the actual service name 'backend-postgres' directly
+      NEXT_PUBLIC_API_BASE_URL: http://backend-postgres:${BACKEND_INTERNAL_PORT}
     restart: unless-stopped
 
 volumes:
