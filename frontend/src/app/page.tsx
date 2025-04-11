@@ -16,6 +16,8 @@ export default function Home() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [editingUser, setEditingUser] = useState<User | null>(null); // State to hold the user being edited
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8001'; // Use env var, fallback for safety
+  const [selectedFile, setSelectedFile] = useState<File | null>(null); // State for the selected import file
+  const [isImporting, setIsImporting] = useState<boolean>(false); // State for import loading indicator
 
   const fetchUsers = async () => {
     setLoading(true);
@@ -151,6 +153,106 @@ export default function Home() {
         // Keep modal open on error so user can see the message or retry
     } finally {
         setIsSubmitting(false);
+    } // End finally block
+  }; // End handleFormSubmit
+
+  const handleExport = async () => {
+      console.log("Exporting users to CSV...");
+      try {
+          const response = await fetch(`${API_BASE_URL}/api/users/export/csv`);
+          if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+          }
+
+          // Get the filename from Content-Disposition header if available, otherwise use a default
+          const disposition = response.headers.get('Content-Disposition');
+          let filename = 'users_export.csv';
+          if (disposition && disposition.indexOf('attachment') !== -1) {
+              const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+              const matches = filenameRegex.exec(disposition);
+              if (matches != null && matches[1]) {
+                  filename = matches[1].replace(/['"]/g, '');
+              }
+          }
+
+          const blob = await response.blob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename; // Use the extracted or default filename
+          document.body.appendChild(a); // Append the element to the DOM
+          a.click();
+          a.remove(); // Remove the element after clicking
+          window.URL.revokeObjectURL(url); // Clean up the object URL
+          console.log("Export successful.");
+
+      } catch (e: unknown) {
+          console.error("Failed to export users:", e);
+          const errorMessage = e instanceof Error ? e.message : String(e);
+          alert(`Failed to export users: ${errorMessage}`); // Inform the user
+      }
+  }; // End handleExport
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      setSelectedFile(event.target.files[0]);
+      console.log("File selected:", event.target.files[0].name);
+    } else {
+      setSelectedFile(null);
+    }
+  };
+
+  const handleImport = async () => {
+    if (!selectedFile) {
+      alert("Please select a CSV file to import.");
+      return;
+    }
+
+    setIsImporting(true);
+    setError(null); // Clear previous errors
+    console.log("Importing users from file:", selectedFile.name);
+
+    const formData = new FormData();
+    formData.append('file', selectedFile); // 'file' must match the FastAPI parameter name
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/users/import/csv`, {
+        method: 'POST',
+        body: formData,
+        // Note: Don't set Content-Type header manually when using FormData,
+        // the browser will set it correctly including the boundary.
+      });
+
+      const result = await response.json(); // Always expect JSON response from import endpoint
+
+      if (!response.ok) {
+        // Use detail from JSON response if available
+        throw new Error(result.detail || `HTTP error! status: ${response.status}`);
+      }
+
+      // Display success message and any errors/skipped rows from the backend
+      let message = result.message || "Import completed.";
+      if (result.errors && result.errors.length > 0) {
+          message += `\n\nErrors/Skipped:\n${result.errors.join('\n')}`;
+          // Consider displaying errors more prominently if needed
+      }
+      alert(message);
+
+      fetchUsers(); // Refresh the user list after import
+      setSelectedFile(null); // Clear the selected file
+
+    } catch (e: unknown) {
+      console.error("Failed to import users:", e);
+      const errorMessage = e instanceof Error ? e.message : String(e);
+      setError(`Import failed: ${errorMessage}`); // Show error to user
+      alert(`Import failed: ${errorMessage}`); // Also show in alert for immediate feedback
+    } finally {
+      setIsImporting(false);
+      // Clear the file input visually (optional, might require ref)
+      const fileInput = document.getElementById('csv-import-input') as HTMLInputElement;
+      if (fileInput) {
+          fileInput.value = ''; // Reset file input
+      }
     }
   };
 
@@ -162,16 +264,52 @@ export default function Home() {
          <h1 className="text-2xl sm:text-3xl font-bold mb-6 text-center sm:text-left">
            User Information Management
          </h1>
+{/* Action Buttons and Import Section */}
+<div className="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
+    {/* Import Section */}
+    <div className="flex items-center space-x-2">
+        <input
+            type="file"
+            id="csv-import-input" // Added ID for potential reset
+            accept=".csv"
+            onChange={handleFileChange}
+            className="block w-full text-sm text-gray-500
+                      file:mr-4 file:py-2 file:px-4
+                      file:rounded-full file:border-0
+                      file:text-sm file:font-semibold
+                      file:bg-blue-50 file:text-blue-700
+                      hover:file:bg-blue-100"
+        />
+        <button
+            onClick={handleImport}
+            disabled={!selectedFile || isImporting} // Disable if no file or importing
+            className={`px-4 py-2 text-white rounded ${
+                (!selectedFile || isImporting)
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-purple-600 hover:bg-purple-700'
+            }`}
+        >
+            {isImporting ? 'Importing...' : 'Import Users (CSV)'}
+        </button>
+    </div>
 
-         {/* TODO: Add Search/Filter controls here */}
-         <div className="mb-4 text-right">
-             <button
-               onClick={handleAddUserClick} // Connect button to open modal
-               className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-             >
-               Add User
-             </button>
-         </div>
+    {/* Existing Action Buttons */}
+    <div className="flex space-x-2">
+        <button
+            onClick={handleExport} // Connect button to export function
+            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+        >
+            Export Users (CSV)
+        </button>
+        <button
+            onClick={handleAddUserClick} // Connect button to open modal
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        >
+            Add User
+        </button>
+    </div>
+    {/* Removed extra </button> here */}
+</div>
 
          {loading && <p className="text-center">Loading users...</p>}
          {error && <p className="text-center text-red-500">{error}</p>}

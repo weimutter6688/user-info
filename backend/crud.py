@@ -17,6 +17,10 @@ def get_users(db: Session, skip: int = 0, limit: int = 100) -> List[models.User]
     """Gets a list of users with pagination."""
     return db.query(models.User).offset(skip).limit(limit).all()
 
+def get_all_users(db: Session) -> List[models.User]:
+    """Gets all users without pagination."""
+    return db.query(models.User).all()
+
 def create_user(db: Session, user: schemas.UserCreate) -> models.User:
     """Creates a new user in the database."""
     db_user = models.User(

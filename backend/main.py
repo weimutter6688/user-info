@@ -1,6 +1,10 @@
 import os # Import os module
 from dotenv import load_dotenv # Import load_dotenv
-from fastapi import FastAPI, Depends, HTTPException, Query, status
+import io
+import csv
+import codecs # Needed for reading UploadFile content as text
+from fastapi import FastAPI, Depends, HTTPException, Query, status, UploadFile, File
+from fastapi.responses import StreamingResponse, JSONResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
@@ -163,6 +167,162 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
     return db_user
+
+# --- Data Export ---
+
+@app.get("/api/users/export/csv", tags=["Data Export"])
+def export_users_to_csv(db: Session = Depends(get_db)):
+    """
+    Export all user data (including secondary emails and educations) to a CSV file.
+    """
+    all_users = crud.get_all_users(db) # Use the new function
+
+    output = io.StringIO()
+    # Define CSV header - adjust based on the exact fields you want to export
+    # Including nested data requires careful handling. Here's a basic example.
+    # You might want separate exports for related tables or flatten the structure.
+    fieldnames = [
+        'id', 'full_name', 'birth_date', 'address', 'high_school',
+        'primary_email', 'remark1', 'remark2', 'remark3',
+        'secondary_emails', # Flattened list
+        'educations' # Flattened list (example: "Type: Name (Degree) Start-End")
+    ]
+    writer = csv.DictWriter(output, fieldnames=fieldnames)
+    writer.writeheader()
+
+    for user in all_users:
+        # Flatten secondary emails
+        secondary_emails_str = ", ".join([email.email for email in user.secondary_emails])
+
+        # Flatten education history (example format)
+        educations_str_list = []
+        for edu in user.educations:
+            edu_str = f"{edu.institution_type or 'N/A'}: {edu.institution_name or 'N/A'}"
+            if edu.degree:
+                edu_str += f" ({edu.degree})"
+            if edu.start_date or edu.end_date:
+                 start = edu.start_date.strftime('%Y-%m-%d') if edu.start_date else '?'
+                 end = edu.end_date.strftime('%Y-%m-%d') if edu.end_date else 'Present'
+                 edu_str += f" [{start} - {end}]"
+            educations_str_list.append(edu_str)
+        educations_str = "; ".join(educations_str_list)
+
+
+        writer.writerow({
+            'id': user.id,
+            'full_name': user.full_name,
+            'birth_date': user.birth_date.strftime('%Y-%m-%d') if user.birth_date else None,
+            'address': user.address,
+            'high_school': user.high_school,
+            'primary_email': user.primary_email,
+            'remark1': user.remark1,
+            'remark2': user.remark2,
+            'remark3': user.remark3,
+            'secondary_emails': secondary_emails_str,
+            'educations': educations_str
+        })
+
+    output.seek(0)
+    response = StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=users_export.csv"}
+    )
+    return response
+
+
+# --- Data Import ---
+
+@app.post("/api/users/import/csv", tags=["Data Import"])
+async def import_users_from_csv(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    """
+    Import users from a CSV file.
+    Assumes CSV header matches the UserCreate schema fields (or a subset).
+    Skips users if primary_email already exists.
+    Required columns: primary_email, full_name. Others are optional.
+    """
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(status_code=400, detail="Invalid file type. Please upload a CSV file.")
+
+    imported_count = 0
+    skipped_count = 0
+    errors = []
+
+    try:
+        # Read the file content asynchronously and decode it
+        # Use codecs.iterdecode for robust handling of streaming data
+        content_stream = codecs.iterdecode(file.file, 'utf-8')
+        csv_reader = csv.DictReader(content_stream)
+
+        # Check for required headers (adjust as needed)
+        required_headers = {'primary_email', 'full_name'}
+        if not required_headers.issubset(csv_reader.fieldnames):
+             missing = required_headers - set(csv_reader.fieldnames)
+             raise HTTPException(status_code=400, detail=f"Missing required CSV columns: {', '.join(missing)}")
+
+
+        for row_index, row in enumerate(csv_reader):
+            try:
+                # Basic validation: Check if primary_email exists
+                primary_email = row.get('primary_email')
+                if not primary_email:
+                    errors.append(f"Row {row_index + 2}: Missing primary_email")
+                    skipped_count += 1
+                    continue # Skip row if essential info is missing
+
+                # Check if user already exists
+                existing_user = crud.get_user_by_primary_email(db, email=primary_email)
+                if existing_user:
+                    # errors.append(f"Row {row_index + 2}: User with primary_email '{primary_email}' already exists. Skipping.")
+                    skipped_count += 1
+                    continue # Skip existing user
+
+                # Prepare user data - handle potential missing optional fields gracefully
+                # Convert empty strings to None where appropriate (e.g., for date)
+                birth_date_str = row.get('birth_date')
+                birth_date = birth_date_str if birth_date_str else None
+
+                # TODO: Handle secondary_emails and educations if they are in the CSV
+                # This requires parsing potentially complex string formats (like the one used for export)
+                # For now, we only import core user fields.
+
+                user_data = schemas.UserCreate(
+                    full_name=row.get('full_name', 'N/A'), # Provide default or raise error if required
+                    primary_email=primary_email,
+                    birth_date=birth_date,
+                    address=row.get('address'),
+                    high_school=row.get('high_school'),
+                    remark1=row.get('remark1'),
+                    remark2=row.get('remark2'),
+                    remark3=row.get('remark3'),
+                    secondary_emails=[], # Placeholder - not importing these from CSV yet
+                    educations=[] # Placeholder - not importing these from CSV yet
+                )
+
+                crud.create_user(db=db, user=user_data)
+                imported_count += 1
+
+            except HTTPException as e: # Catch validation errors from Pydantic/Schema
+                 errors.append(f"Row {row_index + 2} (Email: {primary_email}): Validation Error - {e.detail}")
+                 skipped_count += 1
+            except Exception as e:
+                errors.append(f"Row {row_index + 2} (Email: {primary_email}): Error processing row - {str(e)}")
+                skipped_count += 1
+                db.rollback() # Rollback potentially partial changes for this user if create_user failed mid-way
+
+    except Exception as e:
+        # Catch errors during file reading or initial CSV parsing
+        raise HTTPException(status_code=500, detail=f"Error processing CSV file: {str(e)}")
+    finally:
+        await file.close() # Ensure the file is closed
+
+    return JSONResponse(
+        status_code=200,
+        content={
+            "message": f"Import finished. Imported: {imported_count}, Skipped/Errors: {skipped_count}",
+            "errors": errors[:50] # Limit the number of errors returned
+        }
+    )
 
 
 # -- Secondary Emails --
