@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_
-from . import models, schemas
+import models, schemas # Changed from relative import
 from typing import List, Optional
 
 # --- User CRUD ---

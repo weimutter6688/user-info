@@ -4,17 +4,17 @@ from fastapi import FastAPI, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
-from . import crud, models, schemas, database
-from .database import SessionLocal, engine, create_db_and_tables, connect_db, disconnect_db
+import crud, models, schemas, database # Changed from relative import
+from database import SessionLocal, engine, async_create_db_and_tables, connect_db, disconnect_db # Import the new async function
 
 # Load environment variables from .env file
 # This should be one of the first things your application does.
 # It will load variables from a .env file in the current directory or parent directories.
 load_dotenv()
 
-# Create database tables on startup if they don't exist
-# In production, you'd likely use Alembic migrations instead.
-create_db_and_tables() # Uncomment this if you want to auto-create tables on first run
+# Database table creation is moved to the startup event handler
+# to ensure it runs within the async context when using async drivers.
+# create_db_and_tables() # DO NOT CALL HERE AT MODULE LEVEL
 
 app = FastAPI(title="User Info API", description="API for managing user information and emails.")
 
@@ -24,9 +24,12 @@ app = FastAPI(title="User Info API", description="API for managing user informat
 async def startup_event():
     """Connect to database on startup."""
     await connect_db()
-    # You might want to create tables here if they don't exist
-    # Or ensure migrations are applied
-    # create_db_and_tables() # Example: Create tables if they don't exist
+    # Create tables if they don't exist (safe to call multiple times)
+    # This ensures tables are created after the DB connection is established
+    # and within the async context.
+    print("Creating database tables if they don't exist...")
+    await async_create_db_and_tables() # Call the async version
+    print("Database tables checked/created.")
 
 @app.on_event("shutdown")
 async def shutdown_event():

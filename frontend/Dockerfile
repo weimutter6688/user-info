@@ -28,8 +28,8 @@ ENV NODE_ENV production
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/package.json ./package.json
-# Copy node_modules from builder stage if needed for runtime (Next.js standalone output might avoid this)
-# COPY --from=builder /app/node_modules ./node_modules
+# Copy node_modules from builder stage is needed for runtime by `npm start`
+COPY --from=builder /app/node_modules ./node_modules
 
 # Expose the port the app runs on (default 3000 for Next.js)
 EXPOSE 3000

@@ -1,4 +1,3 @@
-version: '3.8'
 
 services:
   db-postgres:
@@ -11,7 +10,7 @@ services:
       POSTGRES_USER: userinfo_user
       POSTGRES_PASSWORD: userinfo_password # CHANGE THIS IN PRODUCTION!
       POSTGRES_DB: userinfo_db
-    ports:
+    # ports: # Commented out as we don't need external access to the DB container directly
       # Optionally map host port to container port for external access (e.g., debugging)
       # - "5432:5432"
     restart: unless-stopped
@@ -48,8 +47,8 @@ services:
     ports:
       # Map host port 3000 to container port 3000
       - "3000:3000"
-    # depends_on:
-    #   - backend-postgres # Simple dependency
+    depends_on:
+      - backend-postgres # Ensure backend starts before frontend
     environment:
       # NEXT_PUBLIC_API_URL: http://backend-postgres:8001/api # If needed at runtime
       NODE_ENV: production

@@ -29,4 +29,4 @@ EXPOSE 8001
 # The port here should match the EXPOSE instruction and the expected port
 # Use 0.0.0.0 to allow connections from outside the container
 # Workers can be adjusted based on expected load and CPU cores
-CMD ["gunicorn", "backend.main:app", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8001"]
+CMD ["gunicorn", "main:app", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8001"]
