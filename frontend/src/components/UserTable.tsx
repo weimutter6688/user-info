@@ -1,41 +1,113 @@
-'use client'; // Mark this component as a Client Component
+'use client';
 
 import React from 'react';
-import Link from 'next/link'; // Import Link
+import Link from 'next/link';
 import { User } from '@/types';
 
 interface UserTableProps {
   users: User[];
-  onEdit: (user: User) => void; // Function to handle editing a user
-  onDelete: (userId: number) => void; // Function to handle deleting a user
+  onEdit: (user: User) => void;
+  onDelete: (userId: number) => void;
 }
 
 const UserTable: React.FC<UserTableProps> = ({ users, onEdit, onDelete }) => {
   if (!users || users.length === 0) {
-    return <p className="text-center text-gray-500">No users found.</p>;
+    return <p className="text-center text-gray-500 p-4">No users found.</p>;
   }
 
   return (
-    <div className="overflow-x-auto shadow-md sm:rounded-lg">
-      <table className="w-full text-sm text-left text-gray-500 dark:text-gray-400">
-        <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-          <tr>
-            <th scope="col" className="px-6 py-3">Full Name</th>
-            <th scope="col" className="px-6 py-3 hidden sm:table-cell">Primary Email</th>
-            <th scope="col" className="px-6 py-3 hidden md:table-cell">Birth Date</th>
-            <th scope="col" className="px-6 py-3 hidden lg:table-cell">Address</th>
-            {/* Add more columns as needed, e.g., for Education */}
-            <th scope="col" className="px-6 py-3">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {users.map((user) => (
-            <tr key={user.id} className="bg-white border-b dark:bg-gray-800 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-              <th scope="row" className="px-6 py-4 font-medium text-gray-900 whitespace-nowrap dark:text-white"><Link href={`/users/${user.id}`} className="hover:underline">{user.full_name}</Link></th><td className="px-6 py-4 hidden sm:table-cell">{user.primary_email}</td><td className="px-6 py-4 hidden md:table-cell">{user.birth_date.toString()}</td><td className="px-6 py-4 hidden lg:table-cell">{user.address}</td><td className="px-6 py-4 space-x-2 whitespace-nowrap"><button onClick={() => onEdit(user)} className="font-medium text-blue-600 dark:text-blue-500 hover:underline">Edit</button><button onClick={() => onDelete(user.id)} className="font-medium text-red-600 dark:text-red-500 hover:underline">Delete</button></td>
+    <div className="mobile-container">
+      {/* 移动端卡片视图 */}
+      <div className="block sm:hidden space-y-4">
+        {users.map((user) => (
+          <div key={user.id} className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <Link
+                href={`/users/${user.id}`}
+                className="text-lg font-medium text-blue-500 hover:text-blue-600 transition-colors"
+              >
+                {user.full_name}
+              </Link>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => onEdit(user)} 
+                  className="btn btn-secondary touch-target px-4"
+                  aria-label={`Edit ${user.full_name}`}
+                >
+                  Edit
+                </button>
+                <button 
+                  onClick={() => onDelete(user.id)} 
+                  className="btn btn-danger touch-target px-4"
+                  aria-label={`Delete ${user.full_name}`}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+            <div className="text-sm space-y-2">
+              <p className="flex justify-between">
+                <span className="text-gray-500">Email:</span>
+                <span className="break-all">{user.primary_email}</span>
+              </p>
+              <p className="flex justify-between">
+                <span className="text-gray-500">Birth Date:</span>
+                <span>{user.birth_date.toString()}</span>
+              </p>
+              <p className="flex justify-between">
+                <span className="text-gray-500">Address:</span>
+                <span className="text-right flex-1 ml-4 break-words">{user.address}</span>
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* 桌面端表格视图 */}
+      <div className="hidden sm:block overflow-x-auto">
+        <table className="table-enhanced w-full">
+          <thead>
+            <tr>
+              <th scope="col">Full Name</th>
+              <th scope="col">Primary Email</th>
+              <th scope="col" className="hidden md:table-cell">Birth Date</th>
+              <th scope="col" className="hidden lg:table-cell">Address</th>
+              <th scope="col" className="text-right">Actions</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {users.map((user) => (
+              <tr key={user.id}>
+                <td className="font-medium">
+                  <Link
+                    href={`/users/${user.id}`}
+                    className="text-blue-500 hover:text-blue-600 transition-colors"
+                  >
+                    {user.full_name}
+                  </Link>
+                </td>
+                <td>{user.primary_email}</td>
+                <td className="hidden md:table-cell">{user.birth_date.toString()}</td>
+                <td className="hidden lg:table-cell">{user.address}</td>
+                <td className="text-right space-x-2 whitespace-nowrap">
+                  <button 
+                    onClick={() => onEdit(user)} 
+                    className="btn btn-secondary px-3 py-1.5"
+                  >
+                    Edit
+                  </button>
+                  <button 
+                    onClick={() => onDelete(user.id)} 
+                    className="btn btn-danger px-3 py-1.5"
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };
