@@ -169,8 +169,7 @@ This project is configured to use a `.env` file in the project root directory to
         ```dotenv
         # .env on Production Server
 
-        # Backend Configuration
-        BACKEND_SERVICE_NAME=backend-postgres # Or your chosen service name
+        # Backend Configuration (Service name 'backend-postgres' is used in docker-compose.yml)
         BACKEND_INTERNAL_PORT=8001
 
         # Frontend Configuration / CORS
@@ -361,3 +360,40 @@ This assumes a Linux server environment.
         ```
 
 Now, your backend configuration is primarily managed via the `.env` file on the server, allowing selection between SQLite and PostgreSQL, and loaded by the systemd service before starting Gunicorn. Nginx proxies requests to the port specified in the Gunicorn startup command.
+
+---
+
+## Troubleshooting
+
+### Next.js API Route Type Error (`Type "{ params: RouteParams; }" is not a valid type...`)
+
+*   **Symptom:** During `npm run build` in the `frontend` directory, you encounter a type error similar to:
+    ```
+    Type error: Route "src/app/api/users/[userId]/route.ts" has an invalid "GET" export:
+      Type "{ params: RouteParams; }" is not a valid type for the function's second argument.
+    ```
+*   **Cause:** This indicates a type mismatch in how the Next.js App Router expects the parameters (`params`) to be handled in API route handlers (like `GET`, `PUT`, `DELETE`). In this project's specific configuration or Next.js version (observed with 15.3.0), the standard parameter destructuring might not work directly. Instead, the framework seems to provide the `params` object wrapped in a `Promise`.
+*   **Affected File:** `frontend/src/app/api/users/[userId]/route.ts` (and potentially similar dynamic API routes).
+*   **Solution:**
+    1.  Modify the function signature of the affected route handlers (`GET`, `PUT`, `DELETE`) to expect a `Promise` for the `params` object. Change the second argument's type from `{ params: YourParamType }` to `{ params: Promise<YourParamType> }`.
+        ```typescript
+        // Example for GET handler
+        import { NextRequest, NextResponse } from 'next/server';
+
+        type RouteParams = { userId: string };
+
+        export async function GET(
+            request: NextRequest,
+            { params }: { params: Promise<RouteParams> } // <-- Changed type here
+        ) {
+            // ... function body
+        }
+        ```
+    2.  Inside the function body, use `await` to resolve the `params` Promise before accessing its properties:
+        ```typescript
+        // Inside the GET handler function
+        const { userId } = await params; // <-- Added await here
+        // Now you can use userId
+        // ... rest of the code
+        ```
+    Apply these changes to all affected route handlers (`GET`, `PUT`, `DELETE`) in the file. After saving the changes, run `npm run build` again in the `frontend` directory to verify the fix.

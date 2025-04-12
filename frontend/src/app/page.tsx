@@ -15,7 +15,7 @@ export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [editingUser, setEditingUser] = useState<User | null>(null); // State to hold the user being edited
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8001'; // Use env var, fallback for safety
+  // API_BASE_URL is no longer needed here, calls will use relative paths to Next.js API routes
   const [selectedFile, setSelectedFile] = useState<File | null>(null); // State for the selected import file
   const [isImporting, setIsImporting] = useState<boolean>(false); // State for import loading indicator
 
@@ -23,7 +23,8 @@ export default function Home() {
     setLoading(true);
     setError(null);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/users/`);
+      // Call the Next.js API route proxy
+      const response = await fetch(`/api/users/`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -55,7 +56,8 @@ export default function Home() {
     if (confirm(`Are you sure you want to delete user ID ${userId}?`)) {
       const deleteUser = async () => {
         try {
-          const response = await fetch(`${API_BASE_URL}/api/users/${userId}`, {
+          // Call the Next.js API route proxy
+          const response = await fetch(`/api/users/${userId}`, {
             method: 'DELETE',
           });
           if (!response.ok) {
@@ -107,7 +109,8 @@ export default function Home() {
             // Note: The current UserFormModal clears secondary emails/educations on edit.
             // If you want to update those, the backend PUT endpoint and frontend form need adjustments.
             // This implementation primarily updates the core User fields.
-            response = await fetch(`${API_BASE_URL}/api/users/${editingUser.id}`, {
+            // Call the Next.js API route proxy for PUT
+            response = await fetch(`/api/users/${editingUser.id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -121,7 +124,8 @@ export default function Home() {
         } else {
             // --- ADD User ---
             console.log("Submitting new user data:", formData);
-            response = await fetch(`${API_BASE_URL}/api/users/`, {
+            // Call the Next.js API route proxy for POST
+            response = await fetch(`/api/users/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -159,7 +163,9 @@ export default function Home() {
   const handleExport = async () => {
       console.log("Exporting users to CSV...");
       try {
-          const response = await fetch(`${API_BASE_URL}/api/users/export/csv`);
+          // Call the Next.js API route proxy for export
+          // NOTE: We still need to create /api/users/export/csv route
+          const response = await fetch(`/api/users/export/csv`);
           if (!response.ok) {
               throw new Error(`HTTP error! status: ${response.status}`);
           }
@@ -216,7 +222,9 @@ export default function Home() {
     formData.append('file', selectedFile); // 'file' must match the FastAPI parameter name
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/users/import/csv`, {
+      // Call the Next.js API route proxy for import
+      // NOTE: We still need to create /api/users/import/csv route
+      const response = await fetch(`/api/users/import/csv`, {
         method: 'POST',
         body: formData,
         // Note: Don't set Content-Type header manually when using FormData,

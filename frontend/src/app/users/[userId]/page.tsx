@@ -5,7 +5,7 @@ import { useParams } from 'next/navigation'; // Use next/navigation for App Rout
 import Link from 'next/link';
 import { User } from '@/types'; // Assuming types are correctly defined
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8001'; // Use env var, fallback for safety
+// API_BASE_URL is no longer needed here, calls will use relative paths to Next.js API routes
 
 export default function UserDetailPage() {
   const params = useParams();
@@ -22,7 +22,8 @@ export default function UserDetailPage() {
         setLoading(true);
         setError(null);
         try {
-          const response = await fetch(`${API_BASE_URL}/api/users/${userId}`);
+          // Call the Next.js API route proxy
+          const response = await fetch(`/api/users/${userId}`);
           if (!response.ok) {
             if (response.status === 404) {
               throw new Error('User not found');
